@@ -2,6 +2,9 @@ import base64
 import ssl
 import sys
 from datetime import datetime
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from socket import *
 
 # Choose a mail server (e.g. Google Mail server) and call it mailserver
@@ -10,12 +13,15 @@ mailserver_port = 587
 
 
 # Util function
-def send_command(command: str) -> str:
+def send_command(command: str, buffer: int = 1024, wait: bool = True) -> str:
     print(f"C: {command}")
     client_socket.send(f"{command}\r\n".encode())
-    recv = client_socket.recv(1024).decode()
-    print(f"S: {recv}")
-    return recv
+    if wait:
+        recv = client_socket.recv(buffer).decode()
+        print(f"S: {recv}")
+        return recv
+    else:
+        return ""
 
 
 # Create socket called client_socket and establish a TCP connection with mailserver
@@ -87,18 +93,25 @@ if recv[:3] != '354':
     sys.exit(0)
 
 # Send message header
-message_header = (f"From: {name} <{username}>\r\n"
-                  f"To: {rcpt}\r\n"
-                  f"Date: {datetime.now()}\r\n"
-                  f"Subject: {subject}\r\n")
+message_data = MIMEMultipart()
+message_data['From'] = f"{name} <{username}>"
+message_data['To'] = rcpt
+message_data['Date'] = str(datetime.now())
+message_data['Subject'] = subject
 
 # Send message data.
-message_data = message_header
-for msg in message:
-    message_data += f"{msg}\r\n"
+message_data.attach(MIMEText("\r\n".join(message)))
+
+# Seng image data.
+with open("image.png", "rb") as img:
+    message_data.attach(MIMEText('<img src="cid:image">', 'html'))
+    image = MIMEImage(img.read())
+    image.add_header('Content-ID', '<image>')
+    message_data.attach(image)
+send_command(str(message_data), wait=False)
 
 # Message ends with a single period.
-send_command(message_data + end_msg)
+send_command(end_msg)
 
 # Send QUIT command and get server response.
 send_command("QUIT")
