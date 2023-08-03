@@ -36,10 +36,15 @@ while True:
     print(message)
 
     # Extract the filename from the given message
+    http_method = message.split()[0]
+    print(f"HTTP method: {http_method}")
     filepath = message.split()[1].partition('//')[2]
     print(f"File path: {filepath}")
     filename = filepath.replace('/', '-')
     print(f"File name: {filename}")
+    request_body = message.partition("\r\n\r\n")[2] if http_method == 'POST' else ""
+    print(f"Request body:\n{request_body}")
+
     file_exist = False
     try:
         # Check weather the file exist in the cache
@@ -71,9 +76,10 @@ while True:
                 c.connect((host_name, port))
 
                 # Ask port 80 for the file requested by the client
-                sendall(c, f"GET /{file_to_get} HTTP/1.1\r\n"
+                sendall(c, f"{http_method} /{file_to_get} HTTP/1.1\r\n"
                            f"Host: {host_name}\r\n"
-                           f"\r\n")
+                           f"\r\n"
+                           f"{request_body}")
 
                 # Read the response into buffer
                 data = recv(c)
